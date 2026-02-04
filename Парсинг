@@ -1,0 +1,65 @@
+import requests
+from bs4 import BeautifulSoup
+import time
+from urllib.parse import urljoin
+
+
+# URL главной страницы РБК
+BASE_URL = "https://www.rbc.ru"
+
+def fetch_page(url):
+    """Загружает HTML-страницу по URL."""
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()  # Проверяет статус 200 OK
+        return response.text
+    except requests.RequestException as e:
+        print(f"Ошибка при загрузке страницы {url}: {e}")
+        return None
+
+def parse_news_list(html):
+    """Извлекает список новостей из HTML главной страницы."""
+    soup = BeautifulSoup(html, "lxml")
+    news_items = []
+
+    # Ищем блоки новостей (селекторы могут меняться — проверяйте через DevTools)
+    for item in soup.select("a.rbc-news-item"):
+        title_elem = item.select_one(".rbc-news-item__title")
+        date_elem = item.select_one(".rbc-news-item__date")
+        desc_elem = item.select_one(".rbc-news-item__text")
+
+        if title_elem:
+            title = title_elem.get_text(strip=True)
+            link = urljoin(BASE_URL, item["href"])  # Формируем полный URL
+            date = date_elem.get_text(strip=True) if date_elem else "Нет даты"
+            description = desc_elem.get_text(strip=True) if desc_elem else ""
+
+            news_items.append({
+                "title": title,
+                "link": link,
+                "date": date,
+                "description": description
+            })
+    return news_items
+
+def main():
+    print("Начинаем парсинг РБК...")
+    html = fetch_page(BASE_URL)
+    if not html:
+        return
+
+    news = parse_news_list(html)
+    
+    # Выводим результаты
+    for i, item in enumerate(news, 1):
+        print(f"\n--- Новость {i} ---")
+        print(f"Заголовок: {item['title']}")
+        print(f"Ссылка: {item['link']}")
+        print(f"Дата: {item['date']}")
+        print(f"Описание: {item['description']}")
+
+if __name__ == "__main__":
+    main()
