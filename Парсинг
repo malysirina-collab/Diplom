@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import time
 from urllib.parse import urljoin
-
+import json  # Импортируем json для работы с JSON-файлами
 
 # URL главной страницы РБК
 BASE_URL = "https://www.rbc.ru"
@@ -51,15 +51,20 @@ def main():
     if not html:
         return
 
-    news = parse_news_list(html)
+    news = parse_news_list(html)  # news — список словарей с новостями
     
-    # Выводим результаты
+    # Выводим результаты в консоль
     for i, item in enumerate(news, 1):
         print(f"\n--- Новость {i} ---")
         print(f"Заголовок: {item['title']}")
         print(f"Ссылка: {item['link']}")
         print(f"Дата: {item['date']}")
         print(f"Описание: {item['description']}")
+
+    # Сохраняем результаты в JSON-файл
+    with open("rbc_news.json", "w", encoding="utf-8") as f:
+        json.dump(news, f, ensure_ascii=False, indent=2)  # ensure_ascii=False для корректного отображения кириллицы
+    print("\nДанные успешно сохранены в файл rbc_news.json")
 
 if __name__ == "__main__":
     main()
