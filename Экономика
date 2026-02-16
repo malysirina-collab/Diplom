@@ -1,0 +1,93 @@
+#Импортируем библиотеки
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import time
+
+#Заголовки запроса (чтобы избежать блокировки), т.к. сайт может воспринимать как автоматический скрип, а не браузер пользователя. Позволяет обойти возможность бана запроса данных
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+}
+#Делаем выборку ссылок по статьям в разделе экономика
+def get_economics_links(pages=2):
+    """
+    Сбор ссылок на статьи из раздела Экономика.
+    pages — количество страниц раздела.
+    """
+    base_url = "https://www.rbc.ru/economics/"
+    links = set()
+
+    for page in range(1, pages + 1):
+        url = base_url if page == 1 else f"{base_url}?page={page}"
+        
+        try:
+            response = requests.get(url, headers=HEADERS, timeout=10)
+            response.raise_for_status()
+        except requests.RequestException:
+            continue
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        for a in soup.find_all("a", href=True):
+            link = a["href"]
+            if link.startswith("https://www.rbc.ru") and "/20" in link:
+                links.add(link)
+
+        time.sleep(1)  # пауза между запросами
+
+    return list(links)
+
+#Извлекаем текст сатьи
+def get_article_text(url):
+    """
+    Получение текста статьи по ссылке.
+    """
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        response.raise_for_status()
+    except requests.RequestException:
+        return None
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    article_body = soup.find("div", {"class": "article__text"})
+    
+    if not article_body:
+        return None
+
+    paragraphs = article_body.find_all("p")
+    text = " ".join(p.get_text() for p in paragraphs)
+
+    return text.strip()
+
+#Собираем датасет
+def build_dataset():
+    links = get_economics_links(pages=2)
+    print(f"Найдено ссылок: {len(links)}")
+
+    data = []
+
+    for link in links:
+        text = get_article_text(link)
+        if text and len(text) > 500:  # отсекаем слишком короткие
+            data.append({
+                "url": link,
+                "text": text,
+                "label": "economics"
+            })
+
+        time.sleep(1)
+
+    df = pd.DataFrame(data)
+    return df
+
+#Запускаем
+df = build_dataset()
+
+print(df.head())
+print("Всего статей:", len(df))
+
+#Сохраняем результаты в CSV
+df.to_csv("rbc_economics.csv", index=False, encoding="utf-8-sig")
+
+
